@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Lineup and Tactics</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lineup and Tactics">
+<meta name="theme-color" content="#0d1b2a">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => console.log('SW error:', err));
+    });
+  }
+</script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --pitch-green: #3a7d44;
+    --pitch-green-alt: #357040;
+    --line-white: rgba(255,255,255,0.85);
+    --player-bg: #0f3d1a;
+    --player-border: #2ea84a;
+    --player-text: #ffffff;
+    --bench-bg: #2d1a4a;
+    --bench-border: #9b6bcc;
+    --panel-bg: rgba(10,20,35,0.92);
+    --accent: #f0c040;
+    --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    --font-display: 'Arial Narrow', 'Impact', 'Haettenschweiler', Arial, sans-serif;
+  }
+
+  body {
+    font-family: var(--font-main);
+    background: #0d1b2a;
+    color: #e8edf2;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  header {
+    width: 100%;
+    background: rgba(10,20,35,0.97);
+    border-bottom: 2px solid var(--accent);
+    padding: 12px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    z-index: 100;
+  }
+
+  .header-title-row {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-align: center;
+    width: 100%;
+  }
+
+  .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+
+  .ctrl-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ctrl-label {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    color: #8fa3ba;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  select, input[type="text"] {
+    background: #1a2e42;
+    border: 1px solid #2d4a66;
+    border-radius: 6px;
+    color: #e8edf2;
+    font-family: var(--font-main);
+    font-size: 14px;
+    padding: 6px 10px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  select:hover, input[type="text"]:hover { border-color: var(--accent); }
+  select:focus, input[type="text"]:focus { border-color: var(--accent); }
+
+  .btn {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: #0d1b2a; }
+  .btn-primary:hover { background: #f5d060; }
+  .btn-secondary { background: #1a2e42; color: #8fa3ba; border: 1px solid #2d4a66; }
+  .btn-secondary:hover { background: #223850; color: #e8edf2; border-color: var(--accent); }
+
+  .main-layout {
+    display: flex;
+    width: 100%;
+    max-width: 1400px;
+    gap: 0;
+    padding: 0;
+    min-height: calc(100vh - 62px);
+  }
+
+  /* ── PITCH ── */
+  .pitch-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 12px;
+    min-width: 0;
+  }
+
+  .pitch-container {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    aspect-ratio: 68/105;
+    min-height: 500px;
+    background: var(--pitch-green);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 3px solid #1a3a20;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  }
+
+  .pitch-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  .pitch-stripes {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0%,
+      transparent calc(100%/14),
+      rgba(0,0,0,0.06) calc(100%/14),
+      rgba(0,0,0,0.06) calc(200%/14)
+    );
+    pointer-events: none;
+  }
+
+  /* Player tokens on pitch */
+  .player-token {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: grab;
+    z-index: 10;
+    user-select: none;
+    transition: filter 0.15s;
+    touch-action: none;
+  }
+  .player-token:hover { filter: brightness(1.15); }
+  .player-token.dragging { cursor: grabbing; z-index: 50; filter: brightness(1.2) drop-shadow(0 4px 8px rgba(0,0,0,0.5)); }
+
+  .token-circle {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: var(--player-bg);
+    border: 4px solid var(--player-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .token-circle.gk { background: #7a6500; border-color: #f0c040; }
+  .token-circle.selected { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(240,192,64,0.4); }
+
+  .token-number {
+    font-family: var(--font-display);
+    font-size: 30px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+  }
+
+  .token-name {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(0,0,0,0.65);
+    border-radius: 3px;
+    padding: 2px 6px;
+    margin-top: 4px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+    letter-spacing: 0.3px;
+  }
+
+  /* ── SIDE PANEL ── */
+  .side-panel {
+    width: 280px;
+    min-width: 260px;
+    background: var(--panel-bg);
+    border-left: 1px solid #1a2e42;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding-bottom: 20px;
+  }
+
+  .panel-section {
+    padding: 16px;
+    border-bottom: 1px solid #1a2e42;
+  }
+
+  .panel-section-title {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+
+  /* Roster list */
+  .roster-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .roster-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #132030;
+    border: 1px solid #1e3450;
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .roster-item:hover { border-color: var(--player-border); background: #1a2e42; }
+  .roster-item.selected { border-color: var(--accent); background: #1e3010; }
+  .roster-item.on-pitch { opacity: 0.5; pointer-events: none; }
+
+  .roster-num {
+    font-family: var(--font-display);
+    font-size: 21px;
+    font-weight: 700;
+    color: #2ea84a;
+    width: 28px;
+    text-align: center;
+  }
+
+  .roster-inputs {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .roster-name-input {
+    background: transparent;
+    border: none;
+    color: #e8edf2;
+    font-size: 19.5px;
+    font-weight: 500;
+    font-family: var(--font-main);
+    padding: 0;
+    width: 100%;
+    outline: none;
+  }
+  .roster-name-input:focus { color: #fff; }
+
+  .pos-badge {
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #1a2e42;
+    color: #8fa3ba;
+    border: 1px solid #2d4a66;
+    cursor: pointer;
+    white-space: nowrap;
+    min-width: 30px;
+    text-align: center;
+  }
+  .pos-gk { background: #3a3000; color: #f0c040; border-color: #7a6500; }
+  .pos-def { background: #0a2a4a; color: #4a9edd; border-color: #1a4a7a; }
+  .pos-mid { background: #0a3a1a; color: #4ab870; border-color: #1a5a2a; }
+  .pos-fwd { background: #3a1a1a; color: #e85a5a; border-color: #6a2a2a; }
+
+  /* Bench section */
+  .bench-area {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .bench-player {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #1a0f2e;
+    border: 1px solid #2d1a4a;
+    border-radius: 8px;
+    padding: 6px 10px;
+  }
+
+  .bench-num {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    color: #9b6bcc;
+    width: 20px;
+    text-align: center;
+  }
+
+  /* Tactics notes */
+  .tactics-textarea {
+    width: 100%;
+    background: #0d1825;
+    border: 1px solid #1e3450;
+    border-radius: 8px;
+    color: #e8edf2;
+    font-family: var(--font-main);
+    font-size: 13px;
+    padding: 10px;
+    resize: vertical;
+    min-height: 90px;
+    outline: none;
+    line-height: 1.5;
+  }
+  .tactics-textarea:focus { border-color: var(--accent); }
+
+  /* Edit modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #0f1e30;
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 24px;
+    width: 320px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.8);
+  }
+  .modal h3 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .modal-field { margin-bottom: 14px; }
+  .modal-field label {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 600;
+    color: #8fa3ba;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+  }
+  .modal-field input, .modal-field select {
+    width: 100%;
+  }
+  .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-btns .btn { flex: 1; text-align: center; }
+
+  /* Formation label */
+  .formation-display {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 1px;
+    pointer-events: none;
+    z-index: 5;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  }
+
+  /* Tooltip */
+  .tip {
+    font-family: var(--font-display);
+    font-size: 11px;
+    color: #5a7a9a;
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  @media (max-width: 700px) {
+    .main-layout { flex-direction: column; }
+    .side-panel { width: 100%; min-width: 0; border-left: none; border-top: 1px solid #1a2e42; }
+    .pitch-container { max-width: 100%; }
+    .token-circle { width: 60px; height: 60px; }
+    .token-number { font-size: 22px; }
+    .token-name { font-size: 9px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-title-row">Lineup and Tactics</div>
+  <div class="header-controls">
+    <div class="ctrl-group">
+      <span class="ctrl-label">Formation</span>
+      <select id="formationSelect">
+        <option value="4-4-2">4-4-2</option>
+        <option value="4-3-3" selected>4-3-3</option>
+        <option value="4-2-3-1">4-2-3-1</option>
+        <option value="4-5-1">4-5-1</option>
+        <option value="3-5-2">3-5-2</option>
+        <option value="3-4-3">3-4-3</option>
+        <option value="5-3-2">5-3-2</option>
+        <option value="5-4-1">5-4-1</option>
+        <option value="4-1-4-1">4-1-4-1</option>
+        <option value="4-3-2-1">4-3-2-1</option>
+        <option value="4-2-2-2">4-2-2-2</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Team</span>
+      <input type="text" id="teamName" value="My Team" style="width:130px;">
+    </div>
+    <button class="btn btn-secondary" onclick="resetPositions()">Reset Positions</button>
+  </div>
+</header>
+
+<div class="main-layout">
+  <div class="pitch-wrapper">
+    <div class="pitch-container" id="pitchContainer">
+      <div class="pitch-stripes"></div>
+
+      <!-- SVG pitch markings
+           ViewBox: 680 x 1050 = 68m x 105m at exactly 10px per metre
+           Origin (0,0) = top-left corner of pitch
+
+           Key measurements (FIFA standard):
+             Pitch:           68m wide  x 105m long
+             Penalty area:    40.32m wide x 16.5m deep  → x: 138.4–541.6, depth: 165px
+             6-yard box:      18.32m wide x 5.5m deep   → x: 248.4–431.6, depth: 55px
+             Goal:             7.32m wide x 2.44m deep  → x: 316.4–363.6, depth: 24.4px
+             Penalty spot:    11m from goal line         → y: 110px in
+             Centre circle:    9.15m radius              → r: 91.5px
+             D arc:            9.15m radius from spot    → r: 91.5px
+             Corner arc:       1m radius                 → r: 10px
+      -->
+      <svg class="pitch-svg" viewBox="0 0 680 1050" xmlns="http://www.w3.org/2000/svg">
+
+        <!-- Pitch outline -->
+        <rect x="0" y="0" width="680" height="1050" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="3"/>
+
+        <!-- Halfway line -->
+        <line x1="0" y1="525" x2="680" y2="525" stroke="rgba(255,255,255,0.85)" stroke-width="2.5"/>
+
+        <!-- Centre circle + spot -->
+        <circle cx="340" cy="525" r="91.5" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.5"/>
+        <circle cx="340" cy="525" r="5" fill="rgba(255,255,255,0.85)"/>
+
+        <!-- ── TOP END ── -->
+        <!-- Penalty area: 40.32m wide (x=138.4 to 541.6), 16.5m deep (y=0 to 165) -->
+        <rect x="138.4" y="0" width="403.2" height="165" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.5"/>
+        <!-- 6-yard box: 18.32m wide (x=248.4 to 431.6), 5.5m deep (y=0 to 55) -->
+        <rect x="248.4" y="0" width="183.2" height="55" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.5"/>
+        <!-- Goal: 7.32m wide (x=316.4 to 363.6), 2.44m deep — sits on goal line -->
+        <rect x="316.4" y="0" width="47.2" height="24.4" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.85)" stroke-width="2"/>
+        <!-- Penalty spot: 11m from goal line → y=110 -->
+        <circle cx="340" cy="110" r="4" fill="rgba(255,255,255,0.85)"/>
+        <!--
+          D arc: circle centred on penalty spot (340, 110), radius 91.5px
+          Find where it intersects y=165 (edge of penalty area):
+            dy = 165 - 110 = 55
+            dx = sqrt(91.5² - 55²) = sqrt(8372.25 - 3025) = sqrt(5347.25) ≈ 73.1
+            Left point:  x = 340 - 73.1 = 266.9,  y = 165
+            Right point: x = 340 + 73.1 = 413.1,  y = 165
+          Arc sweeps AWAY from goal (downward bulge) → large-arc=0, sweep=0
+        -->
+        <path d="M 266.9 165 A 91.5 91.5 0 0 0 413.1 165" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.5"/>
+        <!-- Corner arcs (r=10px = 1m) — each arc starts on one touchline, ends on the other, curving INTO the pitch -->
+        <!-- Top-left: from (10,0) to (0,10) sweeping clockwise into pitch -->
+        <path d="M 10 0 A 10 10 0 0 1 0 10" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2"/>
+        <!-- Top-right: from (670,0) to (680,10) sweeping anti-clockwise into pitch -->
+        <path d="M 670 0 A 10 10 0 0 0 680 10" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2"/>
+
+        <!-- ── BOTTOM END ── -->
+        <!-- Penalty area: y=885 to 1050 -->
+        <rect x="138.4" y="885" width="403.2" height="165" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.5"/>
+        <!-- 6-yard box: y=995 to 1050 -->
+        <rect x="248.4" y="995" width="183.2" height="55" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.5"/>
+        <!-- Goal -->
+        <rect x="316.4" y="1025.6" width="47.2" height="24.4" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.85)" stroke-width="2"/>
+        <!-- Penalty spot: 11m from bottom goal line → y=1050-110=940 -->
+        <circle cx="340" cy="940" r="4" fill="rgba(255,255,255,0.85)"/>
+        <!--
+          D arc: circle centred on (340, 940), radius 91.5px
+          Intersects y=885:
+            dy = 940 - 885 = 55
+            dx = 73.1 (same as above)
+          Arc sweeps AWAY from goal (upward bulge) → sweep=1
+        -->
+        <path d="M 266.9 885 A 91.5 91.5 0 0 1 413.1 885" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.5"/>
+        <!-- Bottom-left: from (0,1040) to (10,1050) sweeping clockwise into pitch -->
+        <path d="M 0 1040 A 10 10 0 0 0 10 1050" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2"/>
+        <!-- Bottom-right: from (670,1050) to (680,1040) sweeping anti-clockwise into pitch -->
+        <path d="M 670 1050 A 10 10 0 0 1 680 1040" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2"/>
+
+      </svg>
+      <!-- Player tokens rendered by JS -->
+    </div>
+    <p class="tip">Drag players to reposition • Click player to edit name/number</p>
+  </div>
+
+  <div class="side-panel">
+    <!-- Starting XI -->
+    <div class="panel-section">
+      <div class="panel-section-title">Starting XI</div>
+      <div class="roster-list" id="startingXI"></div>
+    </div>
+
+    <!-- Bench -->
+    <div class="panel-section">
+      <div class="panel-section-title">Bench (6)</div>
+      <div class="bench-area" id="benchArea"></div>
+    </div>
+
+    <!-- Tactics -->
+    <div class="panel-section">
+      <div class="panel-section-title">Tactics Notes</div>
+      <textarea class="tactics-textarea" id="tacticsNotes" placeholder="Press high, attack down the flanks, set pieces..."></textarea>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3>Edit Player</h3>
+    <div class="modal-field">
+      <label>Number</label>
+      <input type="number" id="editNum" min="1" max="99">
+    </div>
+    <div class="modal-field">
+      <label>Name</label>
+      <input type="text" id="editName" placeholder="Player name">
+    </div>
+    <div class="modal-field">
+      <label>Position</label>
+      <select id="editPos">
+        <option value="GK">GK</option>
+        <option value="DEF">DEF</option>
+        <option value="MID">MID</option>
+        <option value="FWD">FWD</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────
+const defaultNames = [
+  '','','','','',
+  '','','','','',''
+];
+
+let players = Array.from({length: 11}, (_, i) => ({
+  id: i,
+  number: i + 1,
+  name: defaultNames[i] !== undefined ? defaultNames[i] : '',
+  pos: i === 0 ? 'GK' : i < 5 ? 'DEF' : i < 8 ? 'MID' : 'FWD',
+  x: 50, y: 50  // % positions set by formation
+}));
+
+let bench = Array.from({length: 6}, (_, i) => ({
+  id: 11 + i,
+  number: 12 + i,
+  name: '',
+  pos: i === 0 ? 'GK' : i < 3 ? 'DEF' : i < 5 ? 'MID' : 'FWD'
+}));
+
+// ── Formations ─────────────────────────────────────────────────────────
+// Each entry: [x%, y%, 'pos']
+const formations = {
+  '4-3-3': [
+    [50,90,'GK'],
+    [18,72,'DEF'],[38,72,'DEF'],[62,72,'DEF'],[82,72,'DEF'],
+    [26,52,'MID'],[50,52,'MID'],[74,52,'MID'],
+    [22,20,'FWD'],[50,18,'FWD'],[78,20,'FWD'],
+  ],
+  '4-4-2': [
+    [50,90,'GK'],
+    [16,72,'DEF'],[38,72,'DEF'],[62,72,'DEF'],[84,72,'DEF'],
+    [16,52,'MID'],[38,52,'MID'],[62,52,'MID'],[84,52,'MID'],
+    [33,20,'FWD'],[67,20,'FWD'],
+  ],
+  '4-2-3-1': [
+    [50,90,'GK'],
+    [16,74,'DEF'],[38,74,'DEF'],[62,74,'DEF'],[84,74,'DEF'],
+    [34,58,'MID'],[66,58,'MID'],
+    [18,38,'MID'],[50,40,'MID'],[82,38,'MID'],
+    [50,15,'FWD'],
+  ],
+  '4-5-1': [
+    [50,90,'GK'],
+    [16,74,'DEF'],[38,74,'DEF'],[62,74,'DEF'],[84,74,'DEF'],
+    [12,52,'MID'],[30,52,'MID'],[50,52,'MID'],[70,52,'MID'],[88,52,'MID'],
+    [50,18,'FWD'],
+  ],
+  '3-5-2': [
+    [50,90,'GK'],
+    [26,74,'DEF'],[50,74,'DEF'],[74,74,'DEF'],
+    [10,50,'MID'],[28,52,'MID'],[50,54,'MID'],[72,52,'MID'],[90,50,'MID'],
+    [33,20,'FWD'],[67,20,'FWD'],
+  ],
+  '3-4-3': [
+    [50,90,'GK'],
+    [26,74,'DEF'],[50,74,'DEF'],[74,74,'DEF'],
+    [16,52,'MID'],[38,52,'MID'],[62,52,'MID'],[84,52,'MID'],
+    [20,20,'FWD'],[50,16,'FWD'],[80,20,'FWD'],
+  ],
+  '5-3-2': [
+    [50,90,'GK'],
+    [10,74,'DEF'],[28,74,'DEF'],[50,74,'DEF'],[72,74,'DEF'],[90,74,'DEF'],
+    [26,52,'MID'],[50,52,'MID'],[74,52,'MID'],
+    [33,22,'FWD'],[67,22,'FWD'],
+  ],
+  '5-4-1': [
+    [50,90,'GK'],
+    [10,74,'DEF'],[28,74,'DEF'],[50,74,'DEF'],[72,74,'DEF'],[90,74,'DEF'],
+    [16,52,'MID'],[38,52,'MID'],[62,52,'MID'],[84,52,'MID'],
+    [50,18,'FWD'],
+  ],
+  '4-1-4-1': [
+    [50,90,'GK'],
+    [16,76,'DEF'],[38,76,'DEF'],[62,76,'DEF'],[84,76,'DEF'],
+    [50,62,'MID'],
+    [12,44,'MID'],[34,44,'MID'],[66,44,'MID'],[88,44,'MID'],
+    [50,16,'FWD'],
+  ],
+  '4-3-2-1': [
+    [50,90,'GK'],
+    [16,74,'DEF'],[38,74,'DEF'],[62,74,'DEF'],[84,74,'DEF'],
+    [26,56,'MID'],[50,56,'MID'],[74,56,'MID'],
+    [34,36,'FWD'],[66,36,'FWD'],
+    [50,16,'FWD'],
+  ],
+  '4-2-2-2': [
+    [50,90,'GK'],
+    [16,74,'DEF'],[38,74,'DEF'],[62,74,'DEF'],[84,74,'DEF'],
+    [34,60,'MID'],[66,60,'MID'],
+    [20,40,'MID'],[80,40,'MID'],
+    [33,20,'FWD'],[67,20,'FWD'],
+  ],
+};
+
+let currentFormation = '4-3-3';
+let selectedPlayerId = null;
+let editingId = null;
+
+// ── Init ───────────────────────────────────────────────────────────────
+function applyFormation(name) {
+  currentFormation = name;
+  const lbl = document.getElementById('formationLabel'); if (lbl) lbl.textContent = name;
+  const coords = formations[name];
+  if (!coords) return;
+  coords.forEach((slot, i) => {
+    if (players[i]) {
+      players[i].x = slot[0];
+      players[i].y = slot[1];
+      players[i].pos = slot[2];
+    }
+  });
+  renderPitch();
+}
+
+function renderPitch() {
+  const container = document.getElementById('pitchContainer');
+  document.querySelectorAll('.player-token').forEach(el => el.remove());
+  players.forEach(p => {
+    const token = createToken(p);
+    container.appendChild(token);
+    positionToken(token, p.x, p.y);
+  });
+  renderSidePanel();
+}
+
+function createToken(player) {
+  const div = document.createElement('div');
+  div.className = 'player-token';
+  div.id = `token-${player.id}`;
+  div.dataset.id = player.id;
+
+  const circle = document.createElement('div');
+  circle.className = 'token-circle' + (player.pos === 'GK' ? ' gk' : '');
+  if (selectedPlayerId === player.id) circle.classList.add('selected');
+
+  const num = document.createElement('div');
+  num.className = 'token-number';
+  num.textContent = player.number;
+
+  const name = document.createElement('div');
+  name.className = 'token-name';
+  name.textContent = player.name;
+
+  circle.appendChild(num);
+  div.appendChild(circle);
+  div.appendChild(name);
+
+  div.addEventListener('mousedown', startDrag);
+  div.addEventListener('touchstart', startTouchDrag, {passive: false});
+  div.addEventListener('click', (e) => { e.stopPropagation(); openModal(player.id); });
+
+  return div;
+}
+
+function positionToken(el, xPct, yPct) {
+  el.style.left = xPct + '%';
+  el.style.top = yPct + '%';
+}
+
+// ── Drag ───────────────────────────────────────────────────────────────
+let dragState = null;
+
+function startDrag(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const token = e.currentTarget;
+  const pid = parseInt(token.dataset.id);
+  initDrag(token, pid, e.clientX, e.clientY);
+  document.addEventListener('mousemove', onDrag);
+  document.addEventListener('mouseup', endDrag);
+}
+
+function startTouchDrag(e) {
+  e.preventDefault();
+  const token = e.currentTarget;
+  const pid = parseInt(token.dataset.id);
+  const touch = e.touches[0];
+  initDrag(token, pid, touch.clientX, touch.clientY);
+  document.addEventListener('touchmove', onTouchDrag, {passive: false});
+  document.addEventListener('touchend', endTouchDrag);
+}
+
+function initDrag(token, pid, clientX, clientY) {
+  token.classList.add('dragging');
+  const container = document.getElementById('pitchContainer');
+  const rect = container.getBoundingClientRect();
+  dragState = { token, pid, rect };
+}
+
+function onDrag(e) {
+  if (!dragState) return;
+  moveDrag(e.clientX, e.clientY);
+}
+function onTouchDrag(e) {
+  e.preventDefault();
+  if (!dragState) return;
+  moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+}
+
+function moveDrag(clientX, clientY) {
+  const { token, pid, rect } = dragState;
+  let xPct = ((clientX - rect.left) / rect.width) * 100;
+  let yPct = ((clientY - rect.top) / rect.height) * 100;
+  xPct = Math.max(4, Math.min(96, xPct));
+  yPct = Math.max(3, Math.min(97, yPct));
+  token.style.left = xPct + '%';
+  token.style.top = yPct + '%';
+  const p = players.find(p => p.id === pid);
+  if (p) { p.x = xPct; p.y = yPct; }
+}
+
+function endDrag() {
+  if (dragState) {
+    dragState.token.classList.remove('dragging');
+    dragState = null;
+  }
+  document.removeEventListener('mousemove', onDrag);
+  document.removeEventListener('mouseup', endDrag);
+}
+function endTouchDrag() {
+  endDrag();
+  document.removeEventListener('touchmove', onTouchDrag);
+  document.removeEventListener('touchend', endTouchDrag);
+}
+
+// ── Side Panel ─────────────────────────────────────────────────────────
+function renderSidePanel() {
+  renderStartingXI();
+  renderBench();
+}
+
+function posClass(pos) {
+  const map = {GK:'pos-gk', DEF:'pos-def', MID:'pos-mid', FWD:'pos-fwd'};
+  return 'pos-badge ' + (map[pos] || '');
+}
+
+const GK_NAMES = ['Harry', 'Kai', 'Luka', 'Sam', 'Yianni'];
+const PLAYER_NAMES = ['Andreas','Ante','Aydin','Ben','Brady','Hudson','Huss','Jack','Jimmy','Johnny','Kaz','Mani','Nicky','Raph','Roger','Ryan','Sarp','Will','Zion'];
+
+function buildSelect(names, currentVal, isBench) {
+  const sel = document.createElement('select');
+  sel.className = 'roster-name-input';
+  sel.style.background = 'transparent';
+  sel.style.paddingLeft = '0';
+  if (isBench) sel.style.color = '#c0a0e8';
+  const placeholder = document.createElement('option');
+  placeholder.value = ''; placeholder.textContent = 'Select Player';
+  if (!currentVal) placeholder.selected = true;
+  sel.appendChild(placeholder);
+  names.forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n; opt.textContent = n;
+    if (n === currentVal) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  return sel;
+}
+
+function renderStartingXI() {
+  const container = document.getElementById('startingXI');
+  container.innerHTML = '';
+  players.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'roster-item';
+    item.dataset.id = p.id;
+
+    const numDiv = document.createElement('div');
+    numDiv.className = 'roster-num';
+    numDiv.textContent = p.number;
+
+    const inputsDiv = document.createElement('div');
+    inputsDiv.className = 'roster-inputs';
+
+    let nameEl;
+    if (p.pos === 'GK') {
+      nameEl = buildSelect(GK_NAMES, p.name, false);
+      nameEl.addEventListener('change', (e) => {
+        p.name = e.target.value;
+        updateTokenName(p.id, p.name);
+      });
+      nameEl.addEventListener('click', e => e.stopPropagation());
+    } else {
+      nameEl = buildSelect(PLAYER_NAMES, p.name, false);
+      nameEl.addEventListener('change', (e) => {
+        p.name = e.target.value;
+        updateTokenName(p.id, p.name);
+      });
+      nameEl.addEventListener('click', e => e.stopPropagation());
+    }
+
+    const posBadge = document.createElement('span');
+    posBadge.className = posClass(p.pos);
+    posBadge.textContent = p.pos;
+    posBadge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openModal(p.id);
+    });
+
+    inputsDiv.appendChild(nameEl);
+    item.appendChild(numDiv);
+    item.appendChild(inputsDiv);
+    item.appendChild(posBadge);
+
+    item.addEventListener('click', () => openModal(p.id));
+    container.appendChild(item);
+  });
+}
+
+function renderBench() {
+  const container = document.getElementById('benchArea');
+  container.innerHTML = '';
+  bench.forEach((p, idx) => {
+    const item = document.createElement('div');
+    item.className = 'bench-player';
+
+    const numDiv = document.createElement('div');
+    numDiv.className = 'bench-num';
+    numDiv.textContent = p.number;
+
+    const inputsDiv = document.createElement('div');
+    inputsDiv.className = 'roster-inputs';
+
+    let nameEl;
+    if (idx === 0) {
+      nameEl = buildSelect(GK_NAMES, p.name, true);
+      nameEl.addEventListener('change', (e) => { p.name = e.target.value; });
+      nameEl.addEventListener('click', e => e.stopPropagation());
+    } else {
+      nameEl = buildSelect(PLAYER_NAMES, p.name, true);
+      nameEl.addEventListener('change', (e) => { p.name = e.target.value; });
+      nameEl.addEventListener('click', e => e.stopPropagation());
+    }
+
+    const posBadge = document.createElement('span');
+    posBadge.className = posClass(p.pos);
+    posBadge.textContent = p.pos;
+    posBadge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openBenchModal(p.id);
+    });
+
+    inputsDiv.appendChild(nameEl);
+    item.appendChild(numDiv);
+    item.appendChild(inputsDiv);
+    item.appendChild(posBadge);
+    container.appendChild(item);
+  });
+}
+
+function updateTokenName(pid, name) {
+  const token = document.getElementById(`token-${pid}`);
+  if (token) {
+    const nameEl = token.querySelector('.token-name');
+    if (nameEl) nameEl.textContent = name;
+  }
+}
+
+function updateTokenNumber(pid, num) {
+  const token = document.getElementById(`token-${pid}`);
+  if (token) {
+    const numEl = token.querySelector('.token-number');
+    if (numEl) numEl.textContent = num;
+  }
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────
+function openModal(pid) {
+  const p = players.find(p => p.id === pid);
+  if (!p) return;
+  editingId = pid;
+  editingType = 'starter';
+  document.getElementById('editNum').value = p.number;
+  document.getElementById('editName').value = p.name;
+  document.getElementById('editPos').value = p.pos;
+  document.getElementById('editModal').classList.add('open');
+}
+
+let editingType = 'starter';
+
+function openBenchModal(pid) {
+  const p = bench.find(p => p.id === pid);
+  if (!p) return;
+  editingId = pid;
+  editingType = 'bench';
+  document.getElementById('editNum').value = p.number;
+  document.getElementById('editName').value = p.name;
+  document.getElementById('editPos').value = p.pos;
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('editModal').classList.remove('open');
+  editingId = null;
+}
+
+function saveModal() {
+  const num = parseInt(document.getElementById('editNum').value);
+  const name = document.getElementById('editName').value.trim() || 'Player';
+  const pos = document.getElementById('editPos').value;
+
+  if (editingType === 'starter') {
+    const p = players.find(p => p.id === editingId);
+    if (p) {
+      p.number = num;
+      p.name = name;
+      p.pos = pos;
+      updateTokenNumber(p.id, num);
+      updateTokenName(p.id, name);
+      const token = document.getElementById(`token-${p.id}`);
+      if (token) {
+        const circle = token.querySelector('.token-circle');
+        if (circle) {
+          circle.className = 'token-circle' + (pos === 'GK' ? ' gk' : '');
+        }
+      }
+    }
+  } else {
+    const p = bench.find(p => p.id === editingId);
+    if (p) { p.number = num; p.name = name; p.pos = pos; }
+  }
+
+  closeModal();
+  renderSidePanel();
+}
+
+document.getElementById('editModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ── Formation change ───────────────────────────────────────────────────
+document.getElementById('formationSelect').addEventListener('change', function() {
+  applyFormation(this.value);
+});
+
+// ── Reset ──────────────────────────────────────────────────────────────
+function resetPositions() {
+  applyFormation(currentFormation);
+}
+
+// ── Print ──────────────────────────────────────────────────────────────
+function printPitch() {
+  const teamName = document.getElementById('teamName').value;
+  const tactics = document.getElementById('tacticsNotes').value;
+  const pitchHTML = document.getElementById('pitchContainer').outerHTML;
+  const benchNames = bench.map(p => `#${p.number} ${p.name} (${p.pos})`).join(' | ');
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>${teamName} Lineup</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #0d1b2a; color: #e8edf2; padding: 20px; }
+    h1 { color: #f0c040; font-size: 24px; margin-bottom: 4px; }
+    h2 { color: #8fa3ba; font-size: 14px; font-weight: normal; margin-bottom: 16px; }
+    .pitch-container { position: relative; width: 400px; aspect-ratio: 68/105; background: #3a7d44; border: 3px solid #1a3a20; margin: 0 auto 20px; }
+    .pitch-stripes { position: absolute; top:0;left:0;width:100%;height:100%; background: repeating-linear-gradient(to bottom, transparent 0%, transparent calc(100%/14), rgba(0,0,0,0.06) calc(100%/14), rgba(0,0,0,0.06) calc(200%/14)); }
+    .pitch-svg { position: absolute; top:0;left:0;width:100%;height:100%; }
+    .player-token { position: absolute; transform: translate(-50%,-50%); display: flex; flex-direction: column; align-items: center; }
+    .token-circle { width: 36px; height: 36px; border-radius: 50%; background: #1a3a5c; border: 2px solid #4a9edd; display: flex; align-items: center; justify-content: center; }
+    .token-circle.gk { background: #7a6500; border-color: #f0c040; }
+    .token-number { font-size: 13px; font-weight: bold; color: #fff; }
+    .token-name { font-size: 8px; color: #fff; background: rgba(0,0,0,0.65); border-radius: 3px; padding: 1px 3px; margin-top: 2px; white-space: nowrap; }
+    .bench-box { background: #132030; border: 1px solid #2d4a66; border-radius: 8px; padding: 12px; margin-top: 16px; font-size: 13px; }
+    .bench-box h3 { color: #9b6bcc; margin-bottom: 8px; }
+    .tactics-box { background: #0d1825; border: 1px solid #1e3450; border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 13px; color: #8fa3ba; white-space: pre-wrap; }
+    @media print { body { background: white; color: black; } }
+  </style></head><body>
+  <h1>${teamName}</h1><h2>Formation: ${currentFormation}</h2>
+  ${pitchHTML}
+  <div class="bench-box"><h3>Bench</h3>${benchNames}</div>
+  ${tactics ? `<div class="tactics-box"><strong style="color:#f0c040">Tactics:</strong> ${tactics}</div>` : ''}
+  <script>setTimeout(()=>window.print(),400);<\/script>
+  </body></html>`);
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────
+function boot() { applyFormation('4-3-3'); }
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
+</script>
+</body>
+</html>
