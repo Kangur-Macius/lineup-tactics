@@ -224,18 +224,20 @@
 
   .token-name {
     font-family: var(--font-display);
+    font-size: 14px;
     font-weight: 700;
     color: #fff;
     background: rgba(0,0,0,0.7);
     border-radius: 3px;
     padding: 2px 1px;
     margin-top: 4px;
-    width: 84px;
+    width: 60px;
     box-sizing: border-box;
     overflow: hidden;
     white-space: nowrap;
     text-align: center;
     letter-spacing: 0.2px;
+    text-transform: uppercase;
   }
 
   /* ── SIDE PANEL ── */
@@ -603,7 +605,7 @@
     </div>
     <div class="modal-field">
       <label>Name</label>
-      <input type="text" id="editName" placeholder="Player name">
+      <select id="editName"></select>
     </div>
     <div class="modal-field">
       <label>Position</label>
@@ -778,20 +780,10 @@ function createToken(player) {
   return div;
 }
 
-// Sizes the name label font so text fills the 84px-wide box edge-to-edge,
-// scaling down only as much as needed for longer names.
+// Sets the name label text — font size is fixed via CSS to keep the box neat.
 function fitNameText(el, text) {
   el.textContent = text;
-  const len = (text || '').length || 1;
-  let size;
-  if (len <= 3) size = 26;
-  else if (len <= 4) size = 23;
-  else if (len <= 5) size = 20;
-  else if (len <= 6) size = 18;
-  else if (len <= 7) size = 16;
-  else if (len <= 8) size = 14;
-  else size = 12;
-  el.style.fontSize = size + 'px';
+  el.style.fontSize = '14px';
 }
 
 function positionToken(el, xPct, yPct) {
@@ -1006,14 +998,29 @@ function updateTokenNumber(pid, num) {
 }
 
 // ── Modal ──────────────────────────────────────────────────────────────
+function populateEditNameOptions(pos, currentName) {
+  const sel = document.getElementById('editName');
+  sel.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = ''; placeholder.textContent = 'Select Player';
+  sel.appendChild(placeholder);
+  const list = pos === 'GK' ? GK_NAMES : PLAYER_NAMES;
+  list.forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n; opt.textContent = n;
+    sel.appendChild(opt);
+  });
+  sel.value = currentName || '';
+}
+
 function openModal(pid) {
   const p = players.find(p => p.id === pid);
   if (!p) return;
   editingId = pid;
   editingType = 'starter';
   document.getElementById('editNum').value = p.number;
-  document.getElementById('editName').value = p.name;
   document.getElementById('editPos').value = p.pos;
+  populateEditNameOptions(p.pos, p.name);
   document.getElementById('editModal').classList.add('open');
 }
 
@@ -1025,8 +1032,8 @@ function openBenchModal(pid) {
   editingId = pid;
   editingType = 'bench';
   document.getElementById('editNum').value = p.number;
-  document.getElementById('editName').value = p.name;
   document.getElementById('editPos').value = p.pos;
+  populateEditNameOptions(p.pos, p.name);
   document.getElementById('editModal').classList.add('open');
 }
 
@@ -1037,7 +1044,7 @@ function closeModal() {
 
 function saveModal() {
   const num = parseInt(document.getElementById('editNum').value);
-  const name = document.getElementById('editName').value.trim() || 'Player';
+  const name = document.getElementById('editName').value;
   const pos = document.getElementById('editPos').value;
 
   if (editingType === 'starter') {
@@ -1064,6 +1071,11 @@ function saveModal() {
   closeModal();
   renderSidePanel();
 }
+
+document.getElementById('editPos').addEventListener('change', function() {
+  const currentName = document.getElementById('editName').value;
+  populateEditNameOptions(this.value, currentName);
+});
 
 document.getElementById('editModal').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
