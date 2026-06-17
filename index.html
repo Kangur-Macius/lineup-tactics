@@ -73,9 +73,11 @@
   .header-controls {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 12px;
     flex-wrap: wrap;
     flex: 1;
+    width: 100%;
   }
 
   .ctrl-group {
@@ -222,14 +224,14 @@
 
   .token-name {
     font-family: var(--font-display);
-    font-size: 22px;
+    font-size: 25px;
     font-weight: 600;
     color: #fff;
     background: rgba(0,0,0,0.65);
     border-radius: 3px;
     padding: 2px 6px;
     margin-top: 4px;
-    max-width: 120px;
+    max-width: 130px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -442,8 +444,8 @@
   /* Tooltip */
   .tip {
     font-family: var(--font-display);
-    font-size: 11px;
-    color: #5a7a9a;
+    font-size: 22px;
+    color: #8fa3ba;
     margin-top: 8px;
     text-align: center;
   }
@@ -859,8 +861,8 @@ function posClass(pos) {
   return 'pos-badge ' + (map[pos] || '');
 }
 
-const GK_NAMES = ['Harry', 'Kai', 'Luka', 'Sam', 'Yianni'];
-const PLAYER_NAMES = ['Andreas','Ante','Aydin','Ben','Brady','Dimmi','Hudson','Huss','Jack','Jimmy','Johnny','Kaz','Mani','Nicky','Raph','Roger','Ryan','Sam G','Sam S','Sarp','Will','Zion'];
+const GK_NAMES = ['Connor', 'Harry', 'Kai', 'Luka', 'Sam', 'Yianni'];
+const PLAYER_NAMES = ['Andreas','Ante','Aydin','Ben','Brady','Bryn','Dimmi','Hudson','Huss','Jack','Jimmy','Johnny','Kaz','Mani','Nicky','Novak','Raph','Roger','Ryan','Sam G','Sam S','Sarp','Will','Zion'];
 
 function buildSelect(names, currentVal, isBench) {
   const sel = document.createElement('select');
