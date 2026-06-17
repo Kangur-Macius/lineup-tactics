@@ -224,19 +224,18 @@
 
   .token-name {
     font-family: var(--font-display);
-    font-size: 25px;
-    font-weight: 600;
+    font-weight: 700;
     color: #fff;
-    background: rgba(0,0,0,0.65);
+    background: rgba(0,0,0,0.7);
     border-radius: 3px;
-    padding: 2px 6px;
+    padding: 2px 1px;
     margin-top: 4px;
-    max-width: 130px;
+    width: 84px;
+    box-sizing: border-box;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
     text-align: center;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
   }
 
   /* ── SIDE PANEL ── */
@@ -456,7 +455,7 @@
     .pitch-container { max-width: 100%; }
     .token-circle { width: 60px; height: 60px; }
     .token-number { font-size: 22px; }
-    .token-name { font-size: 9px; }
+    .token-name { width: 60px; }
   }
 </style>
 </head>
@@ -766,7 +765,7 @@ function createToken(player) {
 
   const name = document.createElement('div');
   name.className = 'token-name';
-  name.textContent = player.name;
+  fitNameText(name, player.name);
 
   circle.appendChild(num);
   div.appendChild(circle);
@@ -777,6 +776,22 @@ function createToken(player) {
   div.addEventListener('click', (e) => { e.stopPropagation(); openModal(player.id); });
 
   return div;
+}
+
+// Sizes the name label font so text fills the 84px-wide box edge-to-edge,
+// scaling down only as much as needed for longer names.
+function fitNameText(el, text) {
+  el.textContent = text;
+  const len = (text || '').length || 1;
+  let size;
+  if (len <= 3) size = 26;
+  else if (len <= 4) size = 23;
+  else if (len <= 5) size = 20;
+  else if (len <= 6) size = 18;
+  else if (len <= 7) size = 16;
+  else if (len <= 8) size = 14;
+  else size = 12;
+  el.style.fontSize = size + 'px';
 }
 
 function positionToken(el, xPct, yPct) {
@@ -978,7 +993,7 @@ function updateTokenName(pid, name) {
   const token = document.getElementById(`token-${pid}`);
   if (token) {
     const nameEl = token.querySelector('.token-name');
-    if (nameEl) nameEl.textContent = name;
+    if (nameEl) fitNameText(nameEl, name);
   }
 }
 
